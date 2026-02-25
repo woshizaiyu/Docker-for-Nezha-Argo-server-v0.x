@@ -16,6 +16,13 @@ jobs:
           RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" -m 15 "$URL" || echo "999")
           echo "response=$RESPONSE" >> $GITHUB_OUTPUT
           echo "Ping to $URL → HTTP $RESPONSE"
+          
+      - name: Debug before send
+        run: |
+          echo "RESPONSE from ping: ${{ steps.ping.outputs.response }}"
+          echo "TG_BOT_TOKEN length: ${#TG_BOT_TOKEN}"   # 正常 > 30
+          echo "TG_CHAT_ID first 4 chars: ${TG_CHAT_ID:0:4}"   # 帮 mask 但可见开头
+          echo "MESSAGE preview: $MESSAGE"
 
       - name: Send Telegram Notification
         if: always()
