@@ -2,8 +2,9 @@ name: Koyeb Service Keep Alive - Ping with Telegram Notify
 
 on:
   schedule:
-    - cron: '*/30 * * * *'  # 每30分钟一次
-    timezone: 'Asia/Shanghai'
+    # 每隔 30 分钟触发一次，确保在60分钟休眠期到来前唤醒服务
+    - cron: '*/30 * * * *'
+    timezone: 'Asia/Shanghai' # 确保时区正确
   workflow_dispatch:
 
 
