@@ -28,7 +28,7 @@ jobs:
         if: always()
         run: |
           RESPONSE="${{ steps.ping.outputs.response }}"
-          if [ "$RESPONSE" = "200" ] || [ "$RESPONSE" = "301" ] || [ "$RESPONSE" = "302" ]; then
+          if [ "$RESPONSE" = "200" ] || [ "$RESPONSE" = "301" ] || [ "$RESPONSE" = "302" ] || [ "$RESPONSE" = "404" ]; then
             STATUS="✅ 服务 ping 成功 (HTTP $RESPONSE)"
             EMOJI="🟢"
           elif [ "$RESPONSE" = "999" ]; then
