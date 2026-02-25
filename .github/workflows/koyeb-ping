@@ -1,0 +1,41 @@
+name: Koyeb Service Keep Alive - Ping with Telegram Notify
+
+on:
+  schedule:
+    - cron: '*/35 * * * *'   # 每 25 分钟运行一次（防 60min 休眠）
+  workflow_dispatch:         # 手动测试
+
+jobs:
+  ping-and-notify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Koyeb service
+        id: ping
+        run: |
+          URL="https://wee-casey-1matrixarchitectur-0d99d90a.koyeb.app"  # ← 必须改成你的真实 URL！
+          RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" -m 15 "$URL" || echo "999")
+          echo "response=$RESPONSE" >> $GITHUB_OUTPUT
+          echo "Ping to $URL → HTTP $RESPONSE"
+
+      - name: Send Telegram Notification
+        if: always()  # 即使 ping 失败也发通知
+        run: |
+          RESPONSE="${{ steps.ping.outputs.response }}"
+          if [ "$RESPONSE" = "200" ] || [ "$RESPONSE" = "301" ] || [ "$RESPONSE" = "302" ]; then
+            STATUS="✅ 服务 ping 成功 (HTTP $RESPONSE)"
+            EMOJI="🟢"
+          elif [ "$RESPONSE" = "999" ]; then
+            STATUS="❌ curl 执行异常（超时或网络问题）"
+            EMOJI="🔴"
+          else
+            STATUS="⚠️ 服务响应异常 (HTTP $RESPONSE，可能已休眠或出错)"
+            EMOJI="🟠"
+          fi
+
+          TIME_NOW=$(date -u +"%Y-%m-%d %H:%M:%S UTC")
+          MESSAGE="🕒 Koyeb 服务保活检查 ($TIME_NOW)\n\n$EMOJI $STATUS\nURL: ${{ steps.ping.outputs.url || '未定义' }}"
+
+          curl -s -X POST "https://api.telegram.org/bot${{ secrets.TG_BOT_TOKEN }}/sendMessage" \
+            -d chat_id="${{ secrets.TG_CHAT_ID }}" \
+            -d text="$MESSAGE" \
+            -d parse_mode="Markdown"
