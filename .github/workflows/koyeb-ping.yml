@@ -2,48 +2,70 @@ name: Koyeb Service Keep Alive - Ping with Telegram Notify
 
 on:
   schedule:
-    # 每隔 30 分钟触发一次，确保在60分钟休眠期到来前唤醒服务
-    - cron: '*/30 * * * *'
-    timezone: 'Asia/Shanghai' # 确保时区正确
+    - cron: '9,39 * * * *'  # UTC 对应北京时间每小时 17分 和 47分（间隔30min，避高负载）
   workflow_dispatch:
-
 
 jobs:
   ping-and-notify:
     runs-on: ubuntu-latest
     steps:
-      - name: Ping Koyeb service
+      - name: Log Current Time for Interval Check
+        run: |
+          echo "$(date -u +"%Y-%m-%d %H:%M:%S UTC") - Workflow started (UTC time)"
+
+      - name: Random Jitter to Avoid Queue Congestion
+        run: |
+          sleep $((RANDOM % 300))  # 随机 sleep 0-5分钟，散开高负载队列
+
+      - name: Ping Koyeb service with health check
         id: ping
         run: |
-          URL="https://wee-casey-1matrixarchitectur-0d99d90a.koyeb.app"  # 必须改！例如 https://nezhaha-argo-你的名字.koyeb.app
-          RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" -m 15 "$URL" || echo "999")
+          URL="https://nezha.lds103.cc.cd/"  # 用 Nezha Dashboard 根路径作为 health check
+          RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" -m 15 -L --fail "$URL" || echo "999")
           echo "response=$RESPONSE" >> $GITHUB_OUTPUT
           echo "Ping to $URL → HTTP $RESPONSE"
-          
+
       - name: Debug before send
         run: |
           echo "RESPONSE from ping: ${{ steps.ping.outputs.response }}"
-          echo "TG_BOT_TOKEN length: ${#TG_BOT_TOKEN}"   # 正常 > 30
-          echo "TG_CHAT_ID first 4 chars: ${TG_CHAT_ID:0:4}"   # 帮 mask 但可见开头
-          echo "MESSAGE preview: $MESSAGE"
+          echo "TG_BOT_TOKEN length: ${#TG_BOT_TOKEN}"
+          echo "TG_CHAT_ID first 4 chars: ${TG_CHAT_ID:0:4}"
 
       - name: Send Telegram Notification
         if: always()
         run: |
           RESPONSE="${{ steps.ping.outputs.response }}"
           if [ "$RESPONSE" = "200" ] || [ "$RESPONSE" = "301" ] || [ "$RESPONSE" = "302" ] || [ "$RESPONSE" = "404" ]; then
-            STATUS="✅ 服务 ping 成功 (HTTP $RESPONSE)"
+            STATUS="服务在线 ✅"
             EMOJI="🟢"
+            EXTRA="响应正常，无需唤醒"
           elif [ "$RESPONSE" = "999" ]; then
-            STATUS="❌ curl 执行异常（超时或网络问题）"
+            STATUS="Ping 失败 ❌"
             EMOJI="🔴"
+            EXTRA="curl 超时或网络异常（可能 Koyeb 已休眠）"
           else
-            STATUS="⚠️ 服务响应异常 (HTTP $RESPONSE，可能已休眠或出错)"
+            STATUS="异常响应 ⚠️"
             EMOJI="🟠"
+            EXTRA="HTTP $RESPONSE（服务可能启动中/出错）"
           fi
 
           TIME_NOW=$(date -u +"%Y-%m-%d %H:%M:%S UTC")
-          MESSAGE="🕒 Koyeb 服务保活检查 ($TIME_NOW)\n\n$EMOJI $STATUS\nURL: $URL"
+          NEXT_CHECK=$(date -u -d "+30 minutes" +"%H:%M:%S UTC")  # 匹配30min间隔
+
+          MESSAGE=$(cat <<EOF
+*Koyeb Nezha Dashboard 保活检查*
+
+🕒 时间: $TIME_NOW (UTC)
+
+$EMOJI *状态*: $STATUS
+📍 URL: $URL
+🔍 详情: $EXTRA
+
+预计下次 ≈ $NEXT_CHECK (UTC)
+
+保持在线中... 🚀
+EOF
+)
 
           curl -s -X POST "https://api.telegram.org/bot${{ secrets.TG_BOT_TOKEN }}/sendMessage" \
             -d chat_id="${{ secrets.TG_CHAT_ID }}" \
