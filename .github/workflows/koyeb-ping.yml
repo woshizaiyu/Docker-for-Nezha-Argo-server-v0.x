@@ -2,9 +2,9 @@ name: Koyeb Service Keep Alive - Ping with Telegram Notify
 
 on:
   schedule:
-    - cron: '5,25,45 * * * *'   # 主：每20min（5/25/45），避高负载
-    - cron: '15,35,55 * * * *'  # 备1：每20min，错开覆盖
-    - cron: '8,38 * * * *'      # 备2：每30min，额外保险
+    - cron: '5,25,45 * * * *'   # 主：每20分钟（5/25/45），间隔20min，避开:00/:30高负载
+    - cron: '15,35,55 * * * *'  # 备1：每20分钟（15/35/55），错开主8–10min
+    - cron: '8,38 * * * *'      # 备2：每30分钟（8/38），额外冗余
   workflow_dispatch:
 
 jobs:
@@ -22,7 +22,7 @@ jobs:
       - name: Ping Koyeb service with health check
         id: ping
         run: |
-          URL="https://nezha.lds103.cc.cd/"  # 用 Nezha Dashboard 根路径作为 health check
+          URL="https://wee-casey-1matrixarchitectur-0d99d90a.koyeb.app"  # 已替换成你指定的 Koyeb 原生 URL
           RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" -m 15 -L --fail "$URL" || echo "999")
           echo "response=$RESPONSE" >> $GITHUB_OUTPUT
           echo "Ping to $URL → HTTP $RESPONSE"
@@ -44,32 +44,31 @@ jobs:
           elif [ "$RESPONSE" = "999" ]; then
             STATUS="Ping 失败 ❌"
             EMOJI="🔴"
-            EXTRA="curl 超时或网络异常（可能 Koyeb 已休眠）"
+            EXTRA="curl 完全无法连接（服务很可能已休眠、域名解析问题或网络异常）"
           else
             STATUS="异常响应 ⚠️"
             EMOJI="🟠"
-            EXTRA="HTTP $RESPONSE（服务可能正在唤醒或出现临时问题）"
+            EXTRA="HTTP $RESPONSE（服务可能正在冷启动、临时出错或配置问题）"
           fi
 
           TIME_NOW=$(date -u +"%Y-%m-%d %H:%M:%S UTC")
           BEIJING_TIME=$(TZ='Asia/Shanghai' date +"%Y-%m-%d %H:%M:%S CST")
-          NEXT_CHECK=$(date -u -d "+20 minutes" +"%H:%M:%S UTC")  # 匹配更短间隔
+          NEXT_CHECK=$(date -u -d "+20 minutes" +"%H:%M:%S UTC")
 
-          # 美化版消息：添加北京时间 + 优化布局
           MESSAGE=$(echo -e \
             "━━━━━━━━━━━━━━━━━━━━━━━━━━━\n" \
             "🚀 *Koyeb Nezha Dashboard 保活报告* 🚀\n" \
             "━━━━━━━━━━━━━━━━━━━━━━━━━━━\n" \
             "\n" \
-            "🕒 *UTC 时间*：$TIME_NOW\n" \
-            "🇨🇳 *北京时间*：$BEIJING_TIME\n" \
+            "🕒 *UTC 时间*：${TIME_NOW}\n" \
+            "🇨🇳 *北京时间*：${BEIJING_TIME}\n" \
             "\n" \
-            "$EMOJI *当前状态*：**$STATUS**\n" \
-            "   └─ $EXTRA\n" \
+            "${EMOJI} *当前状态*：**${STATUS}**\n" \
+            "   └─ ${EXTRA}\n" \
             "\n" \
-            "🌐 *监控地址*：[$URL]($URL)\n" \
+            "🌐 *监控地址*：[https://wee-casey-1matrixarchitectur-0d99d90a.koyeb.app/](https://wee-casey-1matrixarchitectur-0d99d90a.koyeb.app/)\n" \
             "\n" \
-            "⏭ *预计下次检查* ≈ $NEXT_CHECK (UTC)\n" \
+            "⏭ *预计下次检查* ≈ ${NEXT_CHECK} (UTC)\n" \
             "\n" \
             "━━━━━━━━━━━━━━━━━━━━━━━━━━━\n" \
             "服务保活中 · 一切正常运行中 💪")
