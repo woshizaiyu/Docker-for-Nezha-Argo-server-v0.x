@@ -2,7 +2,8 @@ name: Koyeb Service Keep Alive - Ping with Telegram Notify
 
 on:
   schedule:
-    - cron: '9,39 * * * *'  # UTC 对应北京时间每小时 17分 和 47分（间隔30min，避高负载）
+    - cron: '*/30 * * * *'           # 每30min（0,30） – 如果延迟大，可改 '5/30 * * * *'（5,35）
+    - cron: '15,45 * * * *'          # 备：15和45分，间隔30min，完美错开主，避免:00
   workflow_dispatch:
 
 jobs:
