@@ -2,8 +2,8 @@ name: Koyeb Service Keep Alive - Ping with Telegram Notify
 
 on:
   schedule:
-    - cron: '*/30 * * * *'           # 每30min（0,30） – 如果延迟大，可改 '5/30 * * * *'（5,35）
-    - cron: '15,45 * * * *'          # 备：15和45分，间隔30min，完美错开主，避免:00
+    - cron: '*/30 * * * *'   # 主：每30分钟（0,30），间隔30min
+    - cron: '10,40 * * * *'  # 备：每小时10分和40分，间隔30min，错开主以防延迟
   workflow_dispatch:
 
 jobs:
@@ -21,7 +21,7 @@ jobs:
       - name: Ping Koyeb service with health check
         id: ping
         run: |
-          URL="https://nezha.lds103.cc.cd/"  # 用 Nezha Dashboard 根路径作为 health check
+          URL="https://nezha.lds103.cc.cd/"  # 用 Nezha Dashboard 根路径作为 health check（推荐 CF 隧道域名）
           RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" -m 15 -L --fail "$URL" || echo "999")
           echo "response=$RESPONSE" >> $GITHUB_OUTPUT
           echo "Ping to $URL → HTTP $RESPONSE"
@@ -51,22 +51,21 @@ jobs:
           fi
 
           TIME_NOW=$(date -u +"%Y-%m-%d %H:%M:%S UTC")
-          NEXT_CHECK=$(date -u -d "+30 minutes" +"%H:%M:%S UTC")  # 匹配30min间隔
+          NEXT_CHECK=$(date -u -d "+30 minutes" +"%H:%M:%S UTC")
 
-          MESSAGE=$(cat <<EOF
-*Koyeb Nezha Dashboard 保活检查*
-
-🕒 时间: $TIME_NOW (UTC)
-
-$EMOJI *状态*: $STATUS
-📍 URL: $URL
-🔍 详情: $EXTRA
-
-预计下次 ≈ $NEXT_CHECK (UTC)
-
-保持在线中... 🚀
-EOF
-)
+          # 使用 echo -e 构建多行消息（避免 heredoc 语法问题）
+          MESSAGE=$(echo -e \
+            "*Koyeb Nezha Dashboard 保活检查*\n" \
+            "\n" \
+            "🕒 时间: $TIME_NOW (UTC)\n" \
+            "\n" \
+            "$EMOJI *状态*: $STATUS\n" \
+            "📍 URL: $URL\n" \
+            "🔍 详情: $EXTRA\n" \
+            "\n" \
+            "预计下次 ≈ $NEXT_CHECK (UTC)\n" \
+            "\n" \
+            "保持在线中... 🚀")
 
           curl -s -X POST "https://api.telegram.org/bot${{ secrets.TG_BOT_TOKEN }}/sendMessage" \
             -d chat_id="${{ secrets.TG_CHAT_ID }}" \
